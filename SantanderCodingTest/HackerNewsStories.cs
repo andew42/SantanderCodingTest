@@ -5,9 +5,24 @@ public class HackerNewsStories
     // Downstream endpoints
     const string BestStoriesEndpoint = "https://hacker-news.firebaseio.com/v0/beststories.json";
     const string StoryEndpoint = "https://hacker-news.firebaseio.com/v0/item/{0}.json";
+    readonly TimeSpan _cacheFlushPeriod = TimeSpan.FromMinutes(5);
 
-    IReadOnlyList<int> _bestStories = Array.Empty<int>();
+    IReadOnlyList<int> _bestStories = [];
     readonly Dictionary<int, HackerNewsStory> _storyCache = [];
+    readonly Timer _cacheFlushTime;
+
+    public HackerNewsStories()
+    {
+        _cacheFlushTime = new Timer(_ =>
+        {
+            // Flush the cache after the cache flush period
+            _bestStories = [];
+            lock (_storyCache)
+                _storyCache.Clear();
+        }, null, _cacheFlushPeriod, _cacheFlushPeriod);
+
+        // TODO: Implement Disposal of Timer
+    }
 
     // Return a list of the best Hacker News stories
     public async Task<IList<HackerNewsStory>> GetBestStoriesAsync(int maxStoryCount)
@@ -23,7 +38,7 @@ public class HackerNewsStories
         var bestStories = _bestStories;
         var numberOfStoriesToRetrieve = Math.Min(maxStoryCount, bestStories.Count);
         var stories = new HackerNewsStory[numberOfStoriesToRetrieve];
-        // Performance could be substantially improved by concurrent requests in batches
+        // TODO: Performance could be substantially improved by concurrent requests in batches
         for (int i = 0; i < numberOfStoriesToRetrieve; i++)
             stories[i] = await GetStoryAsync(bestStories[i]);
         return stories;
@@ -41,7 +56,7 @@ public class HackerNewsStories
         using var httpClient = new HttpClient();
         var rs = await httpClient.GetFromJsonAsync<RawStory>(string.Format(StoryEndpoint, id));
 
-        // Depending on requirements we could just ignore this story
+        // TODO: Depending on requirements we could just ignore this story
         if (rs == null)
             throw new ApplicationException($"Failed to retrieve story ID {id}");
 
